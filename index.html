@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0C1117">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>80 in 8 — Trading Arithmetic Trainer</title>
+<style>
+  :root{
+    --ink:#0C1117;
+    --panel:#141C27;
+    --panel2:#0F161F;
+    --line:#22303F;
+    --text:#E9EEF5;
+    --dim:#7E8CA0;
+    --amber:#FFB224;
+    --amber-dk:#8A5B00;
+    --up:#31C47A;
+    --down:#EF5560;
+    --radius:14px;
+    --mono:"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --sans:"Archivo", -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    background:var(--ink);
+    color:var(--text);
+    font-family:var(--sans);
+    display:flex;justify-content:center;
+    overscroll-behavior:none;
+  }
+  #app{width:100%;max-width:440px;min-height:100dvh;display:flex;flex-direction:column;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+
+  /* ---------- shared ---------- */
+  .board-label{
+    font-family:var(--mono);font-size:11px;letter-spacing:.22em;
+    color:var(--dim);text-transform:uppercase;
+  }
+  .btn{
+    border:1px solid var(--line);background:var(--panel);color:var(--text);
+    border-radius:var(--radius);font-family:var(--sans);font-weight:600;
+    font-size:16px;padding:15px;cursor:pointer;width:100%;
+    transition:transform .06s ease, background .12s ease;
+    touch-action:manipulation;
+  }
+  .btn:active{transform:scale(.985)}
+  .btn:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+  .btn.primary{background:var(--amber);border-color:var(--amber);color:#1A1204;font-weight:700}
+  .btn.ghost{background:transparent}
+  .frac{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1.05;margin:0 2px}
+  .frac .num{padding:0 4px;border-bottom:2px solid currentColor}
+  .frac .den{padding:0 4px}
+
+  /* ---------- home ---------- */
+  .screen{display:none;flex-direction:column;flex:1}
+  .screen.on{display:flex}
+  .masthead{margin-top:26px}
+  .masthead h1{
+    font-family:var(--mono);font-weight:600;font-size:44px;letter-spacing:-.02em;line-height:1;
+  }
+  .masthead h1 .amber{color:var(--amber)}
+  .masthead p{color:var(--dim);margin-top:10px;font-size:14px;line-height:1.5}
+  .rulecard{
+    margin-top:26px;border:1px solid var(--line);border-radius:var(--radius);
+    background:var(--panel2);overflow:hidden;
+  }
+  .rulecard .row{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:13px 16px;border-bottom:1px solid var(--line);font-size:14px;
+  }
+  .rulecard .row:last-child{border-bottom:none}
+  .rulecard .val{font-family:var(--mono);font-size:14px}
+  .val.up{color:var(--up)} .val.down{color:var(--down)}
+  .home-actions{margin-top:auto;display:flex;flex-direction:column;gap:10px;padding-top:26px}
+  .beststrip{
+    margin-top:26px;display:flex;gap:10px;
+  }
+  .beststrip .cell{
+    flex:1;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel2);
+    padding:12px 14px;
+  }
+  .beststrip .cell b{display:block;font-family:var(--mono);font-size:22px;font-weight:600;margin-top:4px}
+
+  /* ---------- test ---------- */
+  .topbar{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--mono)}
+  .topbar .qcount{font-size:13px;color:var(--dim)}
+  .topbar .clock{font-size:20px;font-variant-numeric:tabular-nums}
+  .clock.late{color:var(--down)}
+  .progress{height:3px;background:var(--line);border-radius:2px;margin-top:10px;overflow:hidden}
+  .progress i{display:block;height:100%;width:0%;background:var(--amber);transition:width .2s ease}
+
+  .ticket{
+    margin-top:18px;border:1px solid var(--line);border-radius:var(--radius);
+    background:var(--panel2);padding:26px 18px 22px;text-align:center;position:relative;
+  }
+  .ticket::before{ /* punched ticket notch, the exchange-slip signature */
+    content:"";position:absolute;top:-1px;left:50%;transform:translateX(-50%);
+    width:46px;height:8px;border:1px solid var(--line);border-top:none;
+    border-radius:0 0 8px 8px;background:var(--ink);
+  }
+  .qtext{
+    font-family:var(--mono);font-size:34px;font-weight:600;letter-spacing:-.01em;
+    min-height:52px;display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;
+  }
+  .qtext .frac{font-size:24px}
+  .answerline{
+    margin-top:16px;font-family:var(--mono);font-size:28px;min-height:40px;
+    border-bottom:2px solid var(--line);display:inline-block;min-width:130px;padding:0 8px 4px;
+  }
+  .answerline .caret{display:inline-block;width:2px;height:26px;background:var(--amber);
+    vertical-align:-4px;animation:blink 1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  @media (prefers-reduced-motion: reduce){.answerline .caret{animation:none}}
+  .flash-up{animation:flup .28s ease} .flash-down{animation:fldown .28s ease}
+  @keyframes flup{0%{box-shadow:inset 0 0 0 2px var(--up)}100%{box-shadow:none}}
+  @keyframes fldown{0%{box-shadow:inset 0 0 0 2px var(--down)}100%{box-shadow:none}}
+
+  .tape{
+    margin-top:12px;font-family:var(--mono);font-size:12px;color:var(--dim);
+    display:flex;gap:6px;justify-content:center;min-height:16px;letter-spacing:.05em;
+  }
+  .tape .t-up{color:var(--up)} .tape .t-down{color:var(--down)}
+
+  .pad{margin-top:auto;padding-top:14px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .key{
+    font-family:var(--mono);font-size:22px;font-weight:500;padding:0;height:56px;
+    border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--text);
+    cursor:pointer;transition:transform .05s;touch-action:manipulation;
+  }
+  .key:active{transform:scale(.96);background:var(--line)}
+  .key.fn{font-size:14px;font-family:var(--sans);font-weight:600;color:var(--dim)}
+  .key.enter{grid-row:span 2;height:auto;background:var(--amber);border-color:var(--amber);color:#1A1204;font-weight:700}
+  .key.skip{color:var(--down)}
+
+  /* ---------- results ---------- */
+  .bigscore{margin-top:30px;text-align:center}
+  .bigscore .n{font-family:var(--mono);font-size:72px;font-weight:600;line-height:1}
+  .bigscore .of{color:var(--dim);font-family:var(--mono);font-size:15px;margin-top:6px}
+  .statgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:24px}
+  .statgrid .cell{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel2);padding:12px;text-align:center}
+  .statgrid b{display:block;font-family:var(--mono);font-size:20px;font-weight:600;margin-top:3px}
+  .misslist{margin-top:20px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel2);max-height:200px;overflow:auto}
+  .misslist .row{display:flex;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:13px}
+  .misslist .row:last-child{border-bottom:none}
+  .misslist .yours{color:var(--down);text-decoration:line-through;margin-right:8px}
+  .misslist .real{color:var(--up)}
+
+  /* ---------- history ---------- */
+  .chart{margin-top:18px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel2);padding:16px 14px 10px;display:flex;align-items:flex-end;gap:6px;height:130px}
+  .chart .bar{flex:1;background:var(--line);border-radius:4px 4px 0 0;min-height:4px;position:relative}
+  .chart .bar.best{background:var(--amber)}
+  .chart .bar span{position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:10px;color:var(--dim)}
+  .histlist{margin-top:14px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel2);overflow:auto;max-height:300px}
+  .histlist .row{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line)}
+  .histlist .row:last-child{border-bottom:none}
+  .histlist .when{font-size:13px;color:var(--dim)}
+  .histlist .sc{font-family:var(--mono);font-size:17px;font-weight:600}
+  .empty{padding:26px 16px;text-align:center;color:var(--dim);font-size:14px;line-height:1.5}
+  .backrow{margin-top:auto;padding-top:20px;display:flex;gap:10px}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HOME -->
+  <section class="screen on" id="s-home">
+    <div class="board-label">Trading arithmetic · session board</div>
+    <div class="masthead">
+      <h1><span class="amber">80</span> in <span class="amber">8</span></h1>
+      <p>Eighty typed-answer arithmetic questions against an eight-minute clock, scored the way Optiver scores it.</p>
+    </div>
+    <div class="rulecard">
+      <div class="row"><span>Correct answer</span><span class="val up">+1</span></div>
+      <div class="row"><span>Wrong answer</span><span class="val down">−2</span></div>
+      <div class="row"><span>Skipped</span><span class="val">0</span></div>
+      <div class="row"><span>Mix</span><span class="val">± × ÷ · decimals · fractions</span></div>
+    </div>
+    <div class="beststrip">
+      <div class="cell"><span class="board-label">Best</span><b id="home-best">—</b></div>
+      <div class="cell"><span class="board-label">Last</span><b id="home-last">—</b></div>
+      <div class="cell"><span class="board-label">Runs</span><b id="home-runs">0</b></div>
+    </div>
+    <div class="home-actions">
+      <button class="btn primary" id="btn-start">Start session</button>
+      <button class="btn ghost" id="btn-history">Score history</button>
+    </div>
+  </section>
+
+  <!-- TEST -->
+  <section class="screen" id="s-test">
+    <div class="topbar">
+      <span class="qcount"><span id="qnum">1</span>/80 · <span id="livescore">0</span> pts</span>
+      <span class="clock" id="clock">8:00</span>
+    </div>
+    <div class="progress"><i id="progbar"></i></div>
+    <div class="ticket" id="ticket">
+      <div class="qtext" id="qtext"></div>
+      <div class="answerline"><span id="answ"></span><span class="caret"></span></div>
+      <div class="tape" id="tape"></div>
+    </div>
+    <div class="pad" id="pad">
+      <button class="key" data-k="7">7</button><button class="key" data-k="8">8</button><button class="key" data-k="9">9</button><button class="key fn" data-k="back">⌫</button>
+      <button class="key" data-k="4">4</button><button class="key" data-k="5">5</button><button class="key" data-k="6">6</button><button class="key" data-k="/">⁄</button>
+      <button class="key" data-k="1">1</button><button class="key" data-k="2">2</button><button class="key" data-k="3">3</button><button class="key enter" data-k="enter">↵</button>
+      <button class="key" data-k="-">−</button><button class="key" data-k="0">0</button><button class="key" data-k=".">.</button>
+    </div>
+    <button class="btn ghost" style="margin-top:8px" data-k="skip" id="btn-skip">Skip — no penalty</button>
+  </section>
+
+  <!-- RESULTS -->
+  <section class="screen" id="s-results">
+    <div class="board-label">Session settled</div>
+    <div class="bigscore">
+      <div class="n" id="r-score">0</div>
+      <div class="of">points · max 80</div>
+    </div>
+    <div class="statgrid">
+      <div class="cell"><span class="board-label">Right</span><b id="r-right" style="color:var(--up)">0</b></div>
+      <div class="cell"><span class="board-label">Wrong</span><b id="r-wrong" style="color:var(--down)">0</b></div>
+      <div class="cell"><span class="board-label">Skipped</span><b id="r-skip">0</b></div>
+    </div>
+    <div class="statgrid" style="grid-template-columns:repeat(2,1fr)">
+      <div class="cell"><span class="board-label">Accuracy</span><b id="r-acc">—</b></div>
+      <div class="cell"><span class="board-label">Sec / question</span><b id="r-pace">—</b></div>
+    </div>
+    <div class="board-label" style="margin-top:20px" id="miss-label">Review misses</div>
+    <div class="misslist" id="misslist"></div>
+    <div class="backrow">
+      <button class="btn primary" id="btn-again">Run it again</button>
+      <button class="btn ghost" id="btn-home1">Home</button>
+    </div>
+  </section>
+
+  <!-- HISTORY -->
+  <section class="screen" id="s-history">
+    <div class="board-label">Score history</div>
+    <div class="beststrip" style="margin-top:16px">
+      <div class="cell"><span class="board-label">Best</span><b id="h-best">—</b></div>
+      <div class="cell"><span class="board-label">Avg (last 10)</span><b id="h-avg">—</b></div>
+      <div class="cell"><span class="board-label">Runs</span><b id="h-runs">0</b></div>
+    </div>
+    <div class="chart" id="chart"></div>
+    <div class="histlist" id="histlist"></div>
+    <div class="backrow">
+      <button class="btn ghost" id="btn-home2">Home</button>
+      <button class="btn ghost" id="btn-clear" style="color:var(--down)">Clear history</button>
+    </div>
+  </section>
+</div>
+
+<script>
+/* ================= question generation ================= */
+const rnd=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+const pick=a=>a[rnd(0,a.length-1)];
+
+function fracHTML(n,d){return `<span class="frac"><span class="num">${n}</span><span class="den">${d}</span></span>`;}
+const round2=x=>Math.round(x*10000)/10000;
+
+const GENS=[
+  // addition — weight 18
+  {w:18,f:()=>{const a=rnd(15,989),b=rnd(15,989);return{h:`${a} + ${b}`,ans:a+b};}},
+  // subtraction (occasionally negative) — 18
+  {w:18,f:()=>{let a=rnd(15,989),b=rnd(15,989);if(Math.random()<0.75&&b>a)[a,b]=[b,a];return{h:`${a} − ${b}`,ans:a-b};}},
+  // multiplication — 24
+  {w:24,f:()=>{
+    const t=rnd(0,2);
+    let a,b;
+    if(t===0){a=rnd(12,99);b=rnd(3,9);}
+    else if(t===1){a=rnd(11,19);b=rnd(11,19);}
+    else{a=rnd(11,29);b=rnd(11,25);}
+    return{h:`${a} × ${b}`,ans:a*b};}},
+  // clean division — 16
+  {w:16,f:()=>{const d=pick([3,4,6,7,8,9,11,12,13,14,15,16,25]);const q=rnd(3,40);return{h:`${d*q} ÷ ${d}`,ans:q};}},
+  // decimals — 14
+  {w:14,f:()=>{
+    const t=rnd(0,3);
+    if(t===0){const a=rnd(2,9)/10,b=rnd(2,9)/10;return{h:`${a} × ${b}`,ans:round2(a*b)};}
+    if(t===1){const a=rnd(11,99)/10,b=rnd(11,99)/10;return{h:`${a} + ${b}`,ans:round2(a+b)};}
+    if(t===2){const n=rnd(4,60);const m=pick([0.5,0.25,0.2,0.75,1.5]);return{h:`${n} × ${m}`,ans:round2(n*m)};}
+    let a=rnd(51,199)/10,b=rnd(11,50)/10;return{h:`${a} − ${b}`,ans:round2(a-b)};}},
+  // fractions — 10
+  {w:10,f:()=>{
+    const t=rnd(0,2);
+    if(t===0){ // same-denominator sum
+      const d=pick([4,5,6,8,10,12]);const a=rnd(1,d-1),b=rnd(1,d-1);
+      return{h:`${fracHTML(a,d)} + ${fracHTML(b,d)}`,ans:(a+b)/d,frac:true};}
+    if(t===1){ // fraction of an integer
+      const d=pick([3,4,5,6,8]);const a=rnd(1,d-1);const n=d*rnd(2,12);
+      return{h:`${fracHTML(a,d)} × ${n}`,ans:a*n/d};}
+    // fraction → decimal
+    const d=pick([2,4,5,8,10,20,25]);const a=rnd(1,d-1);
+    return{h:`${fracHTML(a,d)} as a decimal`,ans:a/d};}}
+];
+const TOTALW=GENS.reduce((s,g)=>s+g.w,0);
+function genQ(){let r=Math.random()*TOTALW;for(const g of GENS){if((r-=g.w)<=0)return g.f();}return GENS[0].f();}
+
+/* ================= answer parsing ================= */
+function parseAns(s){
+  s=s.trim();if(!s||s==="-"||s==="."||s==="-.")return null;
+  if(s.includes("/")){
+    const[p,q]=s.split("/");const n=parseFloat(p),d=parseFloat(q);
+    if(!isFinite(n)||!isFinite(d)||d===0)return null;return n/d;
+  }
+  const v=parseFloat(s);return isFinite(v)?v:null;
+}
+const isCorrect=(inp,ans)=>{const v=parseAns(inp);return v!==null&&Math.abs(v-ans)<1e-6;};
+function fmtAns(q){ // display form of correct answer
+  if(Number.isInteger(q.ans))return String(q.ans);
+  return String(round2(q.ans));
+}
+
+/* ================= state & screens ================= */
+const $=id=>document.getElementById(id);
+const screens={home:$("s-home"),test:$("s-test"),results:$("s-results"),history:$("s-history")};
+function show(name){Object.values(screens).forEach(s=>s.classList.remove("on"));screens[name].classList.add("on");}
+
+const DURATION=480, TOTAL=80, STORE_KEY="eighty_in_eight_history";
+let state=null,timerId=null;
+
+const hasClaudeStore=typeof window.storage!=="undefined"&&window.storage&&typeof window.storage.get==="function";
+async function loadHistory(){
+  if(hasClaudeStore){
+    try{const r=await window.storage.get(STORE_KEY);return r?JSON.parse(r.value):[];}
+    catch(e){return [];}
+  }
+  try{const r=localStorage.getItem(STORE_KEY);return r?JSON.parse(r):[];}catch(e){return [];}
+}
+async function saveHistory(h){
+  if(hasClaudeStore){
+    try{await window.storage.set(STORE_KEY,JSON.stringify(h));return;}catch(e){console.error("save failed",e);}
+  }
+  try{localStorage.setItem(STORE_KEY,JSON.stringify(h));}catch(e){console.error("save failed",e);}
+}
+
+/* ================= test flow ================= */
+function startTest(){
+  state={i:0,score:0,right:0,wrong:0,skip:0,input:"",q:genQ(),misses:[],start:Date.now(),left:DURATION,tape:[]};
+  show("test");render();
+  clearInterval(timerId);
+  timerId=setInterval(tick,250);
+}
+function tick(){
+  const el=Math.floor((Date.now()-state.start)/1000);
+  state.left=DURATION-el;
+  if(state.left<=0){state.left=0;endTest();return;}
+  drawClock();
+}
+function drawClock(){
+  const m=Math.floor(state.left/60),s=state.left%60;
+  const c=$("clock");c.textContent=`${m}:${String(s).padStart(2,"0")}`;
+  c.classList.toggle("late",state.left<=60);
+}
+function render(){
+  $("qnum").textContent=state.i+1;
+  $("livescore").textContent=state.score;
+  $("qtext").innerHTML=state.q.h;
+  $("answ").textContent=state.input;
+  $("progbar").style.width=(state.i/TOTAL*100)+"%";
+  $("tape").innerHTML=state.tape.slice(-8).map(t=>`<span class="${t>0?"t-up":t<0?"t-down":""}">${t>0?"+1":t<0?"−2":"·"}</span>`).join("");
+  drawClock();
+}
+function flash(cls){
+  const t=$("ticket");t.classList.remove("flash-up","flash-down");
+  void t.offsetWidth;t.classList.add(cls);
+}
+function submit(){
+  if(!state)return;
+  const v=parseAns(state.input);
+  if(v===null)return; // ignore empty/incomplete submits
+  if(isCorrect(state.input,state.q.ans)){state.score++;state.right++;state.tape.push(1);flash("flash-up");}
+  else{state.score-=2;state.wrong++;state.tape.push(-1);flash("flash-down");
+    state.misses.push({h:state.q.h,yours:state.input,ans:fmtAns(state.q)});}
+  advance();
+}
+function skip(){if(!state)return;state.skip++;state.tape.push(0);advance();}
+function advance(){
+  state.i++;state.input="";
+  if(state.i>=TOTAL){endTest();return;}
+  state.q=genQ();render();
+}
+function endTest(){
+  clearInterval(timerId);
+  const answered=state.right+state.wrong;
+  const used=Math.min(DURATION,Math.round((Date.now()-state.start)/1000));
+  $("r-score").textContent=state.score;
+  $("r-score").style.color=state.score>=0?"var(--text)":"var(--down)";
+  $("r-right").textContent=state.right;
+  $("r-wrong").textContent=state.wrong;
+  $("r-skip").textContent=state.skip;
+  $("r-acc").textContent=answered?Math.round(state.right/answered*100)+"%":"—";
+  $("r-pace").textContent=answered?(used/answered).toFixed(1):"—";
+  const ml=$("misslist");
+  if(state.misses.length){
+    $("miss-label").style.display="block";ml.style.display="block";
+    ml.innerHTML=state.misses.map(m=>`<div class="row"><span>${m.h}</span><span><span class="yours">${m.yours}</span><span class="real">${m.ans}</span></span></div>`).join("");
+  }else{$("miss-label").style.display="none";ml.style.display="none";}
+  persistRun({date:Date.now(),score:state.score,right:state.right,wrong:state.wrong,skip:state.skip});
+  state=null;
+  show("results");
+}
+async function persistRun(run){
+  const h=await loadHistory();h.push(run);
+  if(h.length>200)h.splice(0,h.length-200);
+  await saveHistory(h);refreshHome(h);
+}
+
+/* ================= input ================= */
+function key(k){
+  if(!state)return;
+  if(k==="enter")return submit();
+  if(k==="skip")return skip();
+  if(k==="back"){state.input=state.input.slice(0,-1);}
+  else if(state.input.length<10){
+    if(k==="-"&&state.input!=="")return;              // minus only leads
+    if(k==="."&&/\.\d*$|\.$/.test(state.input))return; // one decimal point per part
+    if(k==="/"&&(state.input.includes("/")||state.input===""))return;
+    state.input+=k;
+  }
+  $("answ").textContent=state.input;
+}
+$("pad").addEventListener("click",e=>{const b=e.target.closest("[data-k]");if(b)key(b.dataset.k);});
+$("btn-skip").addEventListener("click",()=>key("skip"));
+document.addEventListener("keydown",e=>{
+  if(!screens.test.classList.contains("on"))return;
+  if(/^[0-9]$/.test(e.key))key(e.key);
+  else if(e.key==="."||e.key==="-"||e.key==="/")key(e.key);
+  else if(e.key==="Backspace")key("back");
+  else if(e.key==="Enter")key("enter");
+  else if(e.key.toLowerCase()==="s")key("skip");
+});
+
+/* ================= home & history ================= */
+async function refreshHome(h){
+  h=h||await loadHistory();
+  const best=h.length?Math.max(...h.map(r=>r.score)):null;
+  $("home-best").textContent=best===null?"—":best;
+  $("home-last").textContent=h.length?h[h.length-1].score:"—";
+  $("home-runs").textContent=h.length;
+}
+async function openHistory(){
+  const h=await loadHistory();
+  $("h-runs").textContent=h.length;
+  const best=h.length?Math.max(...h.map(r=>r.score)):null;
+  $("h-best").textContent=best===null?"—":best;
+  const last10=h.slice(-10);
+  $("h-avg").textContent=last10.length?Math.round(last10.reduce((s,r)=>s+r.score,0)/last10.length):"—";
+  const ch=$("chart");
+  if(last10.length){
+    ch.style.display="flex";
+    const max=Math.max(1,...last10.map(r=>r.score));
+    ch.innerHTML=last10.map(r=>{
+      const hpc=Math.max(4,(Math.max(0,r.score)/max)*100);
+      return `<div class="bar ${r.score===best?"best":""}" style="height:${hpc}%"><span>${r.score}</span></div>`;
+    }).join("");
+  }else ch.style.display="none";
+  const hl=$("histlist");
+  hl.innerHTML=h.length
+    ?h.slice().reverse().map(r=>{
+      const d=new Date(r.date);
+      const when=d.toLocaleDateString(undefined,{day:"numeric",month:"short"})+" · "+d.toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"});
+      return `<div class="row"><span class="when">${when} — ${r.right}✓ ${r.wrong}✗ ${r.skip}·</span><span class="sc">${r.score}</span></div>`;})
+      .join("")
+    :`<div class="empty">No sessions settled yet.<br>Run one and your scores will book here.</div>`;
+  show("history");
+}
+
+$("btn-start").addEventListener("click",startTest);
+$("btn-again").addEventListener("click",startTest);
+$("btn-history").addEventListener("click",openHistory);
+$("btn-home1").addEventListener("click",()=>{refreshHome();show("home");});
+$("btn-home2").addEventListener("click",()=>{refreshHome();show("home");});
+$("btn-clear").addEventListener("click",async()=>{
+  if(!confirm("Delete all saved scores?"))return;
+  await saveHistory([]);openHistory();refreshHome([]);
+});
+
+
+if ("serviceWorker" in navigator && location.protocol === "https:") {
+  navigator.serviceWorker.register("sw.js").catch(()=>{});
+}
+refreshHome();
+</script>
+</body>
+</html>
